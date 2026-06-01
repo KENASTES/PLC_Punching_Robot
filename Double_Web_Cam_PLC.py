@@ -15,9 +15,11 @@ except ImportError:
 # Camera Settings
 # ==========================================================
 
+# เพิ่มการตั้งค่า rotation เข้าไป: 
+# 0 = ปกติ, 1 = หมุน 90 องศา (ตามเข็ม), 2 = หมุน 90 องศา (ทวนเข็ม), 3 = หมุน 180 องศา
 CAMERA_CONFIGS = [
-    {"index": 0, "name": "Webcam 1 - Targets 1,2,3", "label_start": 1},
-    {"index": 2, "name": "Webcam 2 - Targets 4,5,6", "label_start": 4},
+    {"index": 0, "name": "Webcam 1 - Targets 1,2,3", "label_start": 1, "rotation": 0},
+    {"index": 2, "name": "Webcam 2 - Targets 4,5,6", "label_start": 4, "rotation": 0},
 ]
 
 FRAME_WIDTH = 640
@@ -108,8 +110,9 @@ active_camera_context = None
 # ==========================================================
 
 class CameraStream:
-    def __init__(self, camera_index):
+    def __init__(self, camera_index, rotation_mode=0):
         self.camera_index = camera_index
+        self.rotation_mode = rotation_mode
         self.cap = None
         self.frame = None
         self.running = False
@@ -143,6 +146,14 @@ class CameraStream:
             success, frame = self.cap.read()
 
             if success:
+                # ระบบหมุนภาพตามโหมดที่ตั้งค่าไว้
+                if self.rotation_mode == 1:
+                    frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+                elif self.rotation_mode == 2:
+                    frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                elif self.rotation_mode == 3:
+                    frame = cv2.rotate(frame, cv2.ROTATE_180)
+
                 with self.lock:
                     self.frame = frame
             else:
@@ -165,11 +176,12 @@ class CameraStream:
 
 
 class CameraContext:
-    def __init__(self, camera_index, window_name, label_start):
+    def __init__(self, camera_index, window_name, label_start, rotation_mode=0):
         self.camera_index = camera_index
         self.window_name = window_name
         self.label_start = label_start
-        self.stream = CameraStream(camera_index)
+        # ส่งค่า rotation_mode ไปให้ CameraStream ทำการหมุน
+        self.stream = CameraStream(camera_index, rotation_mode)
 
         self.state = STATE_WAIT_COLOR
         self.target_points = []
@@ -795,7 +807,8 @@ camera_contexts = [
     CameraContext(
         camera_index=config["index"],
         window_name=config["name"],
-        label_start=config["label_start"]
+        label_start=config["label_start"],
+        rotation_mode=config.get("rotation", 0)  # ดึงค่า rotation จาก Config มาใช้
     )
     for config in CAMERA_CONFIGS
 ]
